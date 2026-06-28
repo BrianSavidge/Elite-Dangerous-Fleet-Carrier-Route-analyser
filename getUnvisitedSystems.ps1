@@ -45,7 +45,7 @@ $unvisited = $systems | Where-Object {
 
 # --- 3. Filter to K-class primary stars ---
 $kClass = $unvisited | Where-Object {
-    $_.primaryStar.type -like "K*"
+    ($_.primaryStar.type -like "F*" -or $_.primaryStar.type -like "G*") -and ($null -eq $_.bodyCount -or [int]$_.bodyCount -gt 15)
 }
 
 # --- 4. Order by shortest travel distance (TSP) ---
