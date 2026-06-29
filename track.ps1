@@ -58,10 +58,14 @@ function Invoke-EventAction {
 
             if (-not [string]::IsNullOrEmpty($script:CurrentSystem)) {
                 Write-Host "  Running getUnvisitedSystems.ps1 for '$($script:CurrentSystem)'..." -ForegroundColor Cyan
+                $initialOutput = & (Join-Path $PSScriptRoot "getUnvisitedSystems.ps1") -OriginSystem $sc
                 $rawOutput = & (Join-Path $PSScriptRoot "getUnvisitedSystems.ps1") -OriginSystem $script:CurrentSystem -OutputNames
                 if ($rawOutput) {
                     $script:VisitedSystems = ($rawOutput -join "`n") | ConvertFrom-Json
                     Write-Host "  Stored $($script:VisitedSystems.Count) unvisited systems in memory." -ForegroundColor Green
+                    foreach ($system in $script:VisitedSystems) {
+                        Write-Host "    - $system" -ForegroundColor Gray
+                    }
                     if ($script:VisitedSystems.Count -gt 0) {
                         $firstSystem = $script:VisitedSystems[0]
                         Set-Clipboard -Value $firstSystem
@@ -81,7 +85,28 @@ function Invoke-EventAction {
             $script:CurrentSystem = $Event.Body
             Write-Host "  [FSDJump $($Event.timestamp)] OldSystem='$($script:OldSystem)'  CurrentSystem='$($script:CurrentSystem)'" -ForegroundColor Yellow
 
-            if ($script:VisitedSystems.Count -gt 0) {
+            # If we've jumped to the carrier system, set clipboard to the next hop in the route
+            $currentStarSystem = $Event.StarSystem
+            if (-not [string]::IsNullOrEmpty($script:CarrierSystem) -and
+                $currentStarSystem -eq $script:CarrierSystem -and
+                $script:RouteJumps.Count -gt 0) {
+                $routeMatchIndex = -1
+                for ($i = 0; $i -lt $script:RouteJumps.Count; $i++) {
+                    if ($script:RouteJumps[$i].name -eq $script:CarrierSystem) {
+                        $routeMatchIndex = $i
+                        break
+                    }
+                }
+                if ($routeMatchIndex -ge 0 -and $routeMatchIndex + 1 -lt $script:RouteJumps.Count) {
+                    $nextHop = $script:RouteJumps[$routeMatchIndex + 1].name
+                    Set-Clipboard -Value $nextHop
+                    Write-Host "  Arrived at CarrierSystem. Next route hop '$nextHop' copied to clipboard." -ForegroundColor Green
+                }
+                else {
+                    Write-Host "  Arrived at CarrierSystem but no next hop found in route." -ForegroundColor DarkYellow
+                }
+            }
+            elseif ($script:VisitedSystems.Count -gt 0) {
                 # Find CurrentSystem in the visited list (match on StarSystem name portion before " A"/body suffix)
                 $currentSystemName = $script:CurrentSystem -replace '\s+[A-Z\d]+$', ''
                 $matchIndex = -1
@@ -192,3 +217,5 @@ finally {
     $reader.Dispose()
     $fileStream.Dispose()
 }
+
+Pause
