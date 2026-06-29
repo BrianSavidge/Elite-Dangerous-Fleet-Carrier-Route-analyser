@@ -2,7 +2,10 @@ param(
     [Parameter(Mandatory=$false)]
     [string]$OriginSystem = "Blau Eur XX-M b35-5",
 
-    [int]$RadiusLy = 50
+    [int]$RadiusLy = 50,
+    [switch]$OutputFirstName,
+    [int]$OutputIndex = -1,
+    [switch]$OutputNames
 )
 
 $scriptStartTime = Get-Date
@@ -137,24 +140,47 @@ $returnDistance = Get-Distance $currentPos $primaryStarCoords
 $totalDistance += $returnDistance
 
 # --- 5. Output results ---
-Write-Host "`nFound $($visited.Count) unvisited K-class systems (ordered by shortest travel distance):`n" -ForegroundColor Green
-Write-Host "Total travel distance: $([Math]::Round($totalDistance, 2)) ly`n" -ForegroundColor Yellow
+if ($OutputFirstName) {
+    if ($visited.Count -gt 0) {
+        Write-Output $visited[0].name
+    }
+    else {
+        Write-Host "No systems found." -ForegroundColor Red
+    }
+}
+elseif ($OutputIndex -ge 0) {
+    if ($visited.Count -gt $OutputIndex) {
+        Write-Output $visited[$OutputIndex].name
+    }
+    else {
+        Write-Host "No system at index $OutputIndex." -ForegroundColor Yellow
+    }
+}
+elseif ($OutputNames) {
+    # Output a JSON array of system names for programmatic consumption
+    $names = $visited | Select-Object -ExpandProperty name
+    $names | ConvertTo-Json | Write-Output
+}
+else {
+    Write-Host "`nFound $($visited.Count) unvisited K-class systems (ordered by shortest travel distance):`n" -ForegroundColor Green
+    Write-Host "Total travel distance: $([Math]::Round($totalDistance, 2)) ly`n" -ForegroundColor Yellow
 
-$visited | Select-Object `
-    @{Name="Order";Expression={$visited.IndexOf($_) + 1}},
-    name,
-    @{Name="LegDistanceLy";Expression={[Math]::Round($_.LegDistance, 2)}},
-    @{Name="StarType";Expression={$_.primaryStar.type}},
-    @{Name="Stars";Expression={$_.starCount ?? 1}},
-    @{Name="Planets";Expression={$_.bodyCount}},
-    @{Name="NoDiscovery";Expression={($_.bodyCount | Where-Object {-not $_.discovery}).Count}},
-    @{Name="DistanceLy";Expression={$_.distance}},
-    @{Name="X";Expression={$_.coords.x}},
-    @{Name="Y";Expression={$_.coords.y}},
-    @{Name="Z";Expression={$_.coords.z}} |
-    Format-Table -AutoSize
+    $visited | Select-Object `
+        @{Name="Order";Expression={$visited.IndexOf($_) + 1}},
+        name,
+        @{Name="LegDistanceLy";Expression={[Math]::Round($_.LegDistance, 2)}},
+        @{Name="StarType";Expression={$_.primaryStar.type}},
+        @{Name="Stars";Expression={$_.starCount ?? 1}},
+        @{Name="Planets";Expression={$_.bodyCount}},
+        @{Name="NoDiscovery";Expression={($_.bodyCount | Where-Object {-not $_.discovery}).Count}},
+        @{Name="DistanceLy";Expression={$_.distance}},
+        @{Name="X";Expression={$_.coords.x}},
+        @{Name="Y";Expression={$_.coords.y}},
+        @{Name="Z";Expression={$_.coords.z}} |
+        Format-Table -AutoSize
 
-Write-Host "Return distance to primary star: $([Math]::Round($returnDistance, 2)) ly" -ForegroundColor Cyan
+    Write-Host "Return distance to primary star: $([Math]::Round($returnDistance, 2)) ly" -ForegroundColor Cyan
+}
 
 $scriptEndTime = Get-Date
 $scriptDuration = $scriptEndTime - $scriptStartTime
